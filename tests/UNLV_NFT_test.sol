@@ -33,23 +33,16 @@ contract UNLV_NFT_Test {
         Assert.equal(tokenId > 0, true, "NFT should be minted for studentID0");
     }
 
+    /// Test successful minting of an NFT
     /// #sender: account-1
-    /// #value: 100
-    function checkSenderAndValue() public payable {
-        Assert.equal(msg.sender, TestsAccounts.getAccount(1), "wrong sender");
-        Assert.equal(msg.value, 100, "wrong value");
+    function testMintNFTSuccessStudent1() public {
+        // Attempt to mint an NFT for acc0 with studentID1
+        unlvNFT.mintNFT(studentID1); // This should succeed
+
+        // Get the token ID associated with studentID1
+        uint256 tokenId = unlvNFT.getTokenIdByStudentId(studentID1);
+
+        // Verify the token ID is greater than 0, indicating a token was minted
+        Assert.equal(tokenId > 0, true, "NFT should be minted for studentID1");
     }
-
-    // /// Test successful minting of an NFT
-    // /// #sender: account-1
-    // function testMintNFTSuccessStudent1() public {
-    //     // Attempt to mint an NFT for acc0 with studentID1
-    //     unlvNFT.mintNFT(studentID1); // This should succeed
-
-    //     // Get the token ID associated with studentID0
-    //     uint256 tokenId = unlvNFT.getTokenIdByStudentId(studentID1);
-
-    //     // Verify the token ID is greater than 0, indicating a token was minted
-    //     Assert.equal(tokenId > 0, true, "NFT should be minted for studentID1");
-    // }
 }

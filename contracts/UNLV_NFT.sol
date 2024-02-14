@@ -5,6 +5,9 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 // import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
+/**
+ * @custom:dev-run-script ./scripts/testScript.js
+ */
 contract UNLVIdentityNFT is ERC721 {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
@@ -67,12 +70,12 @@ contract UNLVIdentityNFT is ERC721 {
         );
         uint256 tokenId = _tokenByStudentId[studentID];
 
-        // This is the message that the user signed
+        // Message that the user signed
         // It should be the same message that was signed on the client side
         bytes32 message = keccak256(
             abi.encodePacked("Verify student ID", studentID)
         );
-        // This is the hash that was signed
+        // Hash that was signed
         // Message in the Ethereum signed message format
         bytes32 ethSignedMessageHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", message)
