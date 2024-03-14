@@ -9,6 +9,17 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * @custom:dev-run-script ./scripts/testScript.js
  */
 contract UNLVIdentityNFT is ERC721 {
+    // Event to log the data needed for debugging
+    event DebugVerify(
+        uint256 studentID,
+        bytes32 message,
+        bytes32 ethSignedMessageHash,
+        address recoveredSigner,
+        address owner,
+        uint256 tokenId,
+        bool isOwner
+    );
+
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
@@ -61,7 +72,6 @@ contract UNLVIdentityNFT is ERC721 {
     // Requires a signature for verification
     function getTokenIdByStudentId(uint256 studentID, bytes memory signature)
         public
-        view
         returns (uint256)
     {
         require(
@@ -71,19 +81,27 @@ contract UNLVIdentityNFT is ERC721 {
         uint256 tokenId = _tokenByStudentId[studentID];
 
         // Message that the user signed
-        // It should be the same message that was signed on the client side
         bytes32 message = keccak256(
             abi.encodePacked("Verify student ID", studentID)
         );
         // Hash that was signed
-        // Message in the Ethereum signed message format
         bytes32 ethSignedMessageHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", message)
         );
 
         // Recover the address that signed the message
-        // Calls recoverSigner
         address signer = recoverSigner(ethSignedMessageHash, signature);
+
+        // Before requiring the signer to be the owner, emit the debug event
+        emit DebugVerify(
+            studentID,
+            message,
+            ethSignedMessageHash,
+            signer,
+            ownerOf(tokenId),
+            tokenId,
+            ownerOf(tokenId) == signer
+        );
 
         // Verify that the signer is the owner of the NFT
         require(
