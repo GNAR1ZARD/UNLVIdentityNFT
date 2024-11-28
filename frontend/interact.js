@@ -6,19 +6,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let provider, signer, nftContract;
 
     async function initialize() {
-        // Prompt user to connect their Ethereum wallet (if it's not already connected)
         if (typeof window.ethereum === 'undefined') {
             alert('Please install an Ethereum wallet to use this feature!');
             return;
         }
 
         await window.ethereum.request({ method: 'eth_requestAccounts' });
-
-        // Create a new provider and signer
         provider = new ethers.providers.Web3Provider(window.ethereum);
         signer = provider.getSigner();
 
-        // Load contract ABI and address
         const contractABI = [{
             "inputs": [],
             "stateMutability": "nonpayable",
@@ -580,77 +576,85 @@ document.addEventListener('DOMContentLoaded', async () => {
             "outputs": [],
             "stateMutability": "nonpayable",
             "type": "function"
-        }];
-        const contractAddress = "0x82a18928eA1Aaa98050c8F1D1BC1b5FCF2f2fD86"; // Base Sep Testnnet
+        }]; 
+        const contractAddress = "0x82a18928eA1Aaa98050c8F1D1BC1b5FCF2f2fD86"; 
 
-        // Create a contract instance
         nftContract = new ethers.Contract(contractAddress, contractABI, signer);
+
+        nftContract.on("DebugVerify", (studentId, tokenID, event) => {
+            console.log(`Event DebugVerify: Student ID: ${studentId.toString()}, Token ID: ${tokenID.toString()}`);
+        });  
     }
 
     async function mintNFT(studentID) {
-        const isValidStudentId = /^\d{10}$/.test(studentID); // Use a regular expression to validate the input 
-        if (!isValidStudentId) {
+        if (!/^\d{10}$/.test(studentID)) {
             return alert('Please enter a valid student ID.');
         }
 
-        // Send the mint transaction
-        const tx = await nftContract.mintNFT(studentID);
-        console.log('Minting...', tx.hash);
-
-        // Wait for the transaction to be confirmed
-        const receipt = await tx.wait();
-        console.log('Transaction confirmed', receipt);
-    }
-
-    async function verifyNFT(studentID) {
-        // Validate student ID
-        const isValidStudentId = /^\d{10}$/.test(studentID);
-        if (!isValidStudentId) {
-            alert('Please enter a valid student ID.');
-            return;
-        }
-
-        // Prepare the message as in the smart contract
-        const message = `Verify student ID ${studentID}`;
-
-        // Sign the message directly. ethers.js handles prefixing.
-        const signature = await signer.signMessage(message);
-
-        // Convert studentID to a number since the smart contract expects a uint256
-        const studentIDNum = parseInt(studentID);
-
-        // Send the signature along with the student ID to the contract
-        const tokenId = await nftContract.getTokenIdByStudentId(studentIDNum, signature);
-
-        if (tokenId.toNumber() === 0) {
-            console.log(`Verification failed. Token ID not found.`);
-            alert(`Verification failed. Token ID not found.`);
-        } else {
-            console.log(`Token ID is ${tokenId.toString()}`);
-            alert(`Verification successful. Token ID is ${tokenId.toString()}.`);
-        }
-    }
-
-    await initialize();
-
-    // Event listeners 
-    mintButton.addEventListener('click', async () => {
         try {
-            const studentID = studentIdInput.value;
-            await mintNFT(studentID);
+            const tx = await nftContract.mintNFT(studentID, { gasLimit: 1000000 });
+            console.log('Minting...', tx.hash);
+            const receipt = await tx.wait();
+            console.log('Transaction confirmed', receipt);
         } catch (error) {
             console.error('Error minting NFT:', error);
             alert('Error minting NFT. See console for details.');
         }
+    }
+
+    async function verifyNFT(studentID) {
+        if (!/^\d{10}$/.test(studentID)) {
+            return alert('Please enter a valid student ID.');
+        }
+    
+        const message = `Verify student ID ${studentID}`;
+        try {
+            const signature = await signer.signMessage(message);
+            const studentIDNum = parseInt(studentID);
+            const txResponse = await nftContract.getTokenIdByStudentId(studentIDNum, signature, { gasLimit: 1000000 });
+            const receipt = await txResponse.wait();
+    
+            // Find DebugVerify event for debugging purposes
+            const debugEvent = receipt.events.find(e => e.event === "DebugVerify");
+            if (debugEvent) {
+                console.log(`Debug event:`, debugEvent.args);
+            }
+    
+            // Find TokenID event to confirm verification
+            const tokenIdEvent = receipt.events.find(e => e.event === "TokenID");
+            if (tokenIdEvent && tokenIdEvent.args.tokenId.gt(0)) {
+                const tokenId = tokenIdEvent.args.tokenId.toString();
+                console.log(`Token ID is ${tokenId}`);
+                alert(`Verification successful. Token ID is ${tokenId}`);
+            } else {
+                throw new Error('Token ID not found in events');
+            }
+        } catch (error) {
+            // If there's an error, log it and check for a revert reason
+            console.error('Error verifying NFT:', error);
+    
+            // Attempt to parse the revert reason from the error
+            let revertReason = "Could not determine the revert reason.";
+            if (error.data) {
+                try {
+                    revertReason = ethers.utils.defaultAbiCoder.decode(['string'], ethers.utils.hexDataSlice(error.data, 4));
+                } catch (decodingError) {
+                    console.error('Error decoding revert reason:', decodingError);
+                }
+            }
+            alert(`Error verifying NFT. Revert reason: ${revertReason}. See console for details.`);
+        }
+    }    
+
+    await initialize();
+
+    mintButton.addEventListener('click', async () => {
+        const studentID = studentIdInput.value;
+        await mintNFT(studentID);
     });
 
     verifyButton.addEventListener('click', async () => {
-        try {
-            const studentID = studentIdInput.value;
-            await verifyNFT(studentID);
-        } catch (error) {
-            console.error('Error verifying NFT:', error);
-            alert('Error verifying NFT. See console for details.');
-        }
+        const studentID = studentIdInput.value;
+        await verifyNFT(studentID);
     });
 });
